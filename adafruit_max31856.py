@@ -47,6 +47,7 @@ Implementation Notes
 from time import sleep
 from micropython import const
 from adafruit_bus_device.spi_device import SPIDevice
+from adafruit_register.spi_bit import RWBit
 
 try:
     from struct import unpack
@@ -136,13 +137,17 @@ class MAX31856:
     # Tony says this isn't re-entrant or thread safe!
     _BUFFER = bytearray(4)
 
+    _ocfault0 = RWBit(_MAX31856_CR0_REG, 4)
+
+
     def __init__(self, spi, cs, thermocouple_type=ThermocoupleType.K):
-        self._device = SPIDevice(spi, cs, baudrate=500000, polarity=0, phase=1)
+        self.spi_device = SPIDevice(spi, cs, baudrate=500000, polarity=0, phase=1)
 
         # assert on any fault
         self._write_u8(_MAX31856_MASK_REG, 0x0)
         # configure open circuit faults
-        self._write_u8(_MAX31856_CR0_REG, _MAX31856_CR0_OCFAULT0)
+        #self._write_u8(_MAX31856_CR0_REG, _MAX31856_CR0_OCFAULT0)
+        self._ocfault0 = True
 
         # set thermocouple type
         # get current value of CR1 Reg
@@ -272,7 +277,7 @@ class MAX31856:
     def _read_register(self, address, length):
         # pylint: disable=no-member
         # Read a 16-bit BE unsigned value from the specified 8-bit address.
-        with self._device as device:
+        with self.spi_device as device:
             self._BUFFER[0] = address & 0x7F
             device.write(self._BUFFER, end=1)
             device.readinto(self._BUFFER, end=length)
@@ -280,7 +285,7 @@ class MAX31856:
 
     def _write_u8(self, address, val):
         # Write an 8-bit unsigned value to the specified 8-bit address.
-        with self._device as device:
+        with self.spi_device as device:
             self._BUFFER[0] = (address | 0x80) & 0xFF
             self._BUFFER[1] = val & 0xFF
             device.write(self._BUFFER, end=2)  # pylint: disable=no-member
